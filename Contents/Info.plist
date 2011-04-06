@@ -22,7 +22,9 @@
 	<array>
 		<string>Flash</string>
 	</array>
-	<key>PlexPluginDebug</key>
+	<key>PlexFrameworkVersion</key>
+	<string>2</string>
+	<key>PlexPluginConsoleLogging</key>
 	<string>1</string>
 	<key>PlexPluginMode</key>
 	<string>AlwaysOn</string>
