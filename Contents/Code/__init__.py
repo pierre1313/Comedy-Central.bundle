@@ -1,12 +1,20 @@
+import re
+
 COMCENT_PLUGIN_PREFIX       = "/video/comedycentral"
+YAHOO_NAMESPACE  = {'media':'http://search.yahoo.com/mrss/'}
+
+RSS_PATH = "http://www.comedycentral.com/comedycentral/video/data/mrss.jhtml?uri=%s"
+
+ICON = "icon-default.png"
+ART = "art-default.jpg"
 
 ####################################################################################################
 def Start():
-  Plugin.AddPrefixHandler(COMCENT_PLUGIN_PREFIX, MainMenu, "Comedy Central", "icon-default.jpg", "art-default.jpg")
+  Plugin.AddPrefixHandler(COMCENT_PLUGIN_PREFIX, MainMenu, "Comedy Central", ICON, ART)
   Plugin.AddViewGroup("InfoList", viewMode="InfoList", mediaType="items")  
   Plugin.AddViewGroup("List", viewMode="List", mediaType="items")
-  MediaContainer.art = R("art-default.jpg")
-  DirectoryItem.thumb = R("icon-default.jpg")
+  MediaContainer.art = R(ART)
+  DirectoryItem.thumb = R(ICON)
     
 ####################################################################################################
 
@@ -15,36 +23,39 @@ def MainMenu():
   for show in HTML.ElementFromURL("http://www.comedycentral.com/shows/index.jhtml").xpath('//div[@class="hiddencontent"]/ul/li/a'):
     showurl = show.get("href")
     if showurl.count("http://") == 0 and showurl.count("katz") == 0 and showurl.count("scrubs") == 0 and showurl.count("wanda") == 0 and showurl.count("mad_tv") == 0 and showurl.count("colbert") == 0:
-      Log(showurl)
       dir.Append(Function(DirectoryItem(Level1, title = show.text_content()),url=showurl,title = show.text_content().encode('utf-8')))
-    else:
-      Log("********* SITE SPECIFIC ENTRY: " + show.get("href"))
         
   return dir
   
 def Level1(sender, url, title):
   dir = MediaContainer(viewGroup="List", title2=title.encode("utf-8"))        
-  id = ("http://www.comedycentral.com" + url).replace("index.jhtml","videos/index.jhtml")
-  for menu_item in HTML.ElementFromURL(id).xpath('//div[@class="menu"]/a'):
-    title = menu_item.xpath('following-sibling::table/tr/td/span')[0].text_content()
-    Log(menu_item.get("href"))
-    dir.Append(Function(DirectoryItem(Level2, title=title , thumb = "http://www.comedycentral.com" + menu_item.find("img").get("src")), url= menu_item.get("href"), title = title))
-  return dir
+  showurl = ("http://www.comedycentral.com" + url)
+  try:
+    showpage =  HTTP.Request(showurl).content
+    idpos = showpage.find("mgid:cms:video:comedycentral.com:")
+    id =  showpage[idpos:idpos+39].replace(":","%3A")
+    rssfeed = HTTP.Request(RSS_PATH %id).content.replace('media:','media-')
+    for item in XML.ElementFromString(rssfeed).xpath('//item'):#namespaces = YAHOO_NAMESPACE
+      title = item.xpath('title')[0].text.replace('|',' - ')
+      subtitle = item.xpath('pubDate')[0].text
+      summary = item.xpath('description')[0].text
+    
+      stringified = XML.StringFromElement(item)
+    
+      try:
+        duration = int(re.search('duration="([0-9]+)"', stringified).group(1))*1000
+      #duration = int(item.xpath('media-content')[0].get('duration'))*1000
+      except:
+        duration = None
+      
+      try:
+        thumb = re.search('media-thumbnail url="([^&?]+.jpg)', stringified).group(1)
+   #     thumb = item.xpath('media-thumbnail')[0].get('url')
+      except:
+        thumb = R(ICON)
+      url = item.xpath('link')[0].text
+      dir.Append(WebVideoItem(url, title=title , subtitle=subtitle, summary=summary, duration=duration, thumb = thumb))
 
-def Level2(sender, url, title):
-  dir = MediaContainer(viewGroup="InfoList", title1="Comedy Central", title2=title.encode("utf-8"))
-  id = ("http://www.comedycentral.com" + (url).replace(" ","%20"))
-  Log.Add(id)
-  for vid_block in HTML.ElementFromURL(id).xpath('//div[@class="vid_block"]'):
-    #Log.Add(XML.ElementToString(vid_block))
-    id = vid_block.xpath("div[@class='image_holder']/a")[0].get("href")
-    Log.Add("****URL:" + id)
-    title = vid_block.xpath("div[@class='text_holder']/h4/a")[0].text_content()
-    desc = vid_block.find("div[@class='text_holder']/p").text_content()
-    duration = None
-    thumb = vid_block.find("div[@class='image_holder']/a/img").get("src").replace("height=75&width=100","height=225&width=300")
-    subtitle = "Posted: " + vid_block.find("div/div[@class='block']/div").text_content()
-    dir.Append(WebVideoItem(id, title = title, summary = desc, subtitle = subtitle, duration = duration, thumb = thumb))
-  
-  return dir
-  
+    return dir
+  except:
+    return MessageContainer("Error","This page does not contain any video.")
