@@ -56,6 +56,9 @@ def Level1(sender, url, title):
       url = item.xpath('link')[0].text
       dir.Append(WebVideoItem(url, title=title , subtitle=subtitle, summary=summary, duration=duration, thumb = thumb))
 
-    return dir
+    if len(dir) == 0:
+      return MessageContainer("Error","This category does not contain any video.")
+    else:
+      return dir
   except:
-    return MessageContainer("Error","This page does not contain any video.")
+    return MessageContainer("Error","This category does not contain any video.")
