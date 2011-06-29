@@ -32,29 +32,29 @@ def Level1(sender, url, title):
   showurl = ("http://www.comedycentral.com" + url)
   try:
     showpage =  HTTP.Request(showurl).content
-    idpos = showpage.find("mgid:cms:video:comedycentral.com:")
-    id =  showpage[idpos:idpos+39].replace(":","%3A")
-    rssfeed = HTTP.Request(RSS_PATH %id).content.replace('media:','media-')
-    for item in XML.ElementFromString(rssfeed).xpath('//item'):#namespaces = YAHOO_NAMESPACE
-      title = item.xpath('title')[0].text.replace('|',' - ')
-      subtitle = item.xpath('pubDate')[0].text
-      summary = item.xpath('description')[0].text
+    ids =  re.findall("mgid:cms:item:comedycentral.com:[0-9]+",showpage)
+    for id in ids:
+      rssfeed = HTTP.Request(RSS_PATH %id).content.replace('media:','media-')
+      for item in XML.ElementFromString(rssfeed).xpath('//item'):#namespaces = YAHOO_NAMESPACE
+        title = item.xpath('title')[0].text.replace('|',' - ')
+        subtitle = item.xpath('pubDate')[0].text
+        summary = item.xpath('description')[0].text
     
-      stringified = XML.StringFromElement(item)
+        stringified = XML.StringFromElement(item)
     
-      try:
-        duration = int(re.search('duration="([0-9]+)"', stringified).group(1))*1000
+        try:
+          duration = int(re.search('duration="([0-9]+)"', stringified).group(1))*1000
       #duration = int(item.xpath('media-content')[0].get('duration'))*1000
-      except:
-        duration = None
+        except:
+          duration = None
       
-      try:
-        thumb = re.search('media-thumbnail url="([^&?]+.jpg)', stringified).group(1)
+        try:
+          thumb = re.search('media-thumbnail url="([^&?]+.jpg)', stringified).group(1)
    #     thumb = item.xpath('media-thumbnail')[0].get('url')
-      except:
-        thumb = R(ICON)
-      url = item.xpath('link')[0].text
-      dir.Append(WebVideoItem(url, title=title , subtitle=subtitle, summary=summary, duration=duration, thumb = thumb))
+        except:
+          thumb = R(ICON)
+        url = item.xpath('link')[0].text
+        dir.Append(WebVideoItem(url, title=title , subtitle=subtitle, summary=summary, duration=duration, thumb = thumb))
 
     if len(dir) == 0:
       return MessageContainer("Error","This category does not contain any video.")
